@@ -13,6 +13,7 @@
 #include "argparse.h"
 #include "builtin.h"
 
+#define TRUE (1)
 
 /* PROTOTYPES */
 
@@ -26,13 +27,12 @@ ssize_t getinput(char** line, size_t* size);
 
 int main () {
 
-  while(1){
+  while (TRUE) {   // loop until exit
 
-    char** line = calloc(10,10);  // what is this doing 10 x 10, necessary??
+    char** line = calloc(3,3); 
     line[0] = calloc(10, 10);
-    getinput(line, (size_t*) 10);
-    processline(*line);
-    free(line[0]);
+    getinput(line, (size_t*) 10);  // retrieves initial line
+    processline(*line);      // adjusts line to align with arguments and calls builtin
     free(line);
 
   }
@@ -52,36 +52,32 @@ int main () {
 * Hint: There is a standard i/o function that can make getinput easier than it sounds.
 */
 ssize_t getinput(char** line, size_t* size) {
-  //write your code
 
   ssize_t len = 0;
   printf("%c ", 37);
-
-  while(1){
+                    // reads character by character mallocing and freeing when needed
+  while (TRUE) {
 
     char c = fgetc(stdin);
 
-    if(c == EOF){
+    if (c == EOF) {
       perror("fgetc error");
     }
 
-    if (c == '\n'){
+    if (c == '\n') {   // loops until end of line
       break;
     } else {
 
-      if(strlen(*line) == (intptr_t) size){
-
+      if(strlen(*line) == (intptr_t) size) {   // need to malloc for more space
+            // create temp copy over and free after more space is made
         char temp[(intptr_t) size];
         strcpy(temp, *line);
-        free(*line);
         *line = (char*) calloc((intptr_t) size * 2, (intptr_t) size * 2);
         strcpy(*line, temp);
 
       }
-
       len++;
       strncat(*line, &c, 1);
-
     }
   }
   return len;
@@ -97,7 +93,7 @@ ssize_t getinput(char** line, size_t* size) {
  */
 void processline (char *line) {
 
-  if (strlen(line) == 0){
+  if (strlen(line) == 0) {   // check for empty line
     return;
   }
 
@@ -105,40 +101,44 @@ void processline (char *line) {
   int   status;
   int argCount;
   char** arguments = argparse(line, &argCount);
-
-  if(strcmp(arguments[0], "exit") == 0 || strcmp(arguments[0], "pwd") == 0 || strcmp(arguments[0], "cd") == 0
-  || strcmp(arguments[0], "ls") == 0 || strcmp(arguments[0], "cp") == 0 || strcmp(arguments[0], "env") == 0){ // dont fork
-
-    if(builtIn(arguments, argCount) == 0){
-      printf("No command found");
-    }
-
+                             // make sure isn't command I implemented 
+  if (builtIn(arguments, argCount) == 1) { // dont fork
+    // calls in builtin 
   } else { 
 
     cpid = fork();
 
-    if(cpid == 0) {
-      
-      char* test = calloc(strlen(line) + 1, strlen(line) + 1);
-      strcpy(test, "/bin/");
-      strcat(test, arguments[0]); 
+    if (cpid == 0) {
+                      // create space for non implemented calls
+      char* defaultCommand = calloc(strlen(line) + 1, strlen(line) + 1);
+      strcpy(defaultCommand, "/bin/");
+      strcat(defaultCommand, arguments[0]); 
 
-      if(execv(test, arguments) == -1){
+      if (execv(defaultCommand, arguments) == -1) {
         perror("not valid command");
+        free(defaultCommand);
+        exit(1);
+      } else {    // iterate over all arguments to call proper command
+        for (int i = 1; i < argCount; i++) { 
+          if (execvp(arguments[i], arguments) == -1) {
+            perror("not valid command");
+            free(defaultCommand);
+            exit(1);   // error exit with status 1 to stop child process
+          }
+        }      
       }
-
-      for(int i = 1; i < argCount; i++){
-        if(execvp(arguments[i], arguments) == -1){
-          perror("not valid command");
-        }
-      }       
     } else if(cpid > 0) {
-      wait(&status);  // is status actually doing anything?
+      if (wait(&status) == -1) {   // wait for child to finish to prevent zombies
+        perror("error waiting for child to finish on fork");
+      }
     } else {
       perror("fork failed");
     }
   }
 
-  free(arguments[0]);
+  for (int i = 0; i < argCount; i++) {  // free up last used space before restarting
+    free(arguments[i]);
+  }
   free(arguments);
+  free(line);
 }
