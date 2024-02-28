@@ -2,6 +2,10 @@
 
 A project from my Systems II class while at Western Washington Univeristy. This project is a fully workable Linux shell, commands I made are ls, ls -l, cp,env, env [Name=Value], exit, cd [directory], pwd. All other Linux commands are available and implement the fork-exec-wait pattern to run processes, use exec provided by the C library. 
 
+# System requirements ##
+
+Linux machine or Linux based shell.
+
 ## How to run/Examples ##
 
 <b> Compile with: </b>
